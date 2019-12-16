@@ -101,6 +101,9 @@ def find_embedding(S, T, **params):
             to find an embedding for each variable of S such that it is adjacent
             to all its neighbours. Integer >= 0 (default = 10)
 
+        max_chain: Maximum number of qubits assigned to one chain during the
+            search. #TODO
+
         max_fill: Restricts the number of chains that can simultaneously
             incorporate the same qubit during the search. Integer >= 0, values
             above 63 are treated as 63 (default = effectively infinite)
@@ -230,9 +233,10 @@ cdef class _input_parser:
 
         self.opts.localInteractionPtr.reset(new LocalInteractionPython())
 
-        names = {"max_no_improvement", "random_seed", "timeout", "tries", "verbose",
-                 "fixed_chains", "initial_chains", "max_fill", "chainlength_patience",
-                 "return_overlap", "skip_initialization", "inner_rounds", "threads",
+        names = {"max_no_improvement", "random_seed", "timeout", "tries",
+                 "verbose", "fixed_chains", "initial_chains", "max_chain",
+                 "max_fill", "chainlength_patience", "return_overlap",
+                 "skip_initialization", "inner_rounds", "threads",
                  "restrict_chains", "suspend_chains", "max_beta"}
 
         for name in params:
