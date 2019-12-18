@@ -193,9 +193,9 @@ def find_embedding(S, T, **params):
                 * add the edge (i,Zij) to the source graph
                 * add the edges (q,Zij) to the target graph for each q in blob_j
     """
-    cdef _input_parser _in
+    cdef _meta_parser _in
     try:
-        _in = _input_parser(S, T, params)
+        _in = _meta_parser(S, T, params)
     except EmptySourceGraphError:
         return {}
 
@@ -220,10 +220,13 @@ class EmptySourceGraphError(RuntimeError):
     pass
 
 cdef class _input_parser:
+    """ General input-parser class. This class includes only the parameters
+        supported by the lowest-level `minorminer`.
+        NOTE: Inherit this class to parse inputs associated to metafeatures.
+    """
     cdef input_graph Sg, Tg
     cdef labeldict SL, TL
     cdef optional_parameters opts
-    cdef int pincount
     def __init__(self, S, T, params):
         cdef uint64_t *seed
         cdef object z
@@ -233,7 +236,7 @@ cdef class _input_parser:
         names = {"max_no_improvement", "random_seed", "timeout", "tries", "verbose",
                  "fixed_chains", "initial_chains", "max_fill", "chainlength_patience",
                  "return_overlap", "skip_initialization", "inner_rounds", "threads",
-                 "restrict_chains", "suspend_chains", "max_beta"}
+                 "restrict_chains", "max_beta"}
 
         for name in params:
             if name not in names:
@@ -303,11 +306,21 @@ cdef class _input_parser:
         _get_chainmap(params.get("initial_chains", ()), self.opts.initial_chains, self.SL, self.TL, "initial_chains")
         _get_chainmap(params.get("restrict_chains", ()), self.opts.restrict_chains, self.SL, self.TL, "restrict_chains")
 
+cdef class _meta_parser(_input_parser):
+    """ This parser class includes metafeature(s) that aren't part of the
+        base implementation and therefore live in this interface.
+    """
+    cdef int pincount
+
+    def __init__(self, S, T, params):
+        super(_meta_parser,self).__init__(S, T, params)
+        suspend_chains = params.pop("suspend_chains", ())
+
         self.pincount = 0
         cdef int nonempty
         cdef int pinlabel
         cdef vector[int] chain
-        suspend_chains = params.get("suspend_chains", ())
+
         if suspend_chains:
             for v, blobs in suspend_chains.items():
                 for i,blob in enumerate(blobs):
@@ -348,12 +361,12 @@ cdef class miner:
         **params (optional): see documentation of minorminer.find_embedding
 
     """
-    cdef _input_parser _in
+    cdef _meta_parser _in
     cdef bool quickpassed
     cdef pathfinder_wrapper *pf
     def __cinit__(self, S, T, **params):
         try:
-            self._in = _input_parser(S, T, params)
+            self._in = _meta_parser(S, T, params)
         except EmptySourceGraphError:
             raise ValueError, "The source graph has zero edges; cowardly refusing to construct a miner object for a trivial problem."
         self.quickpassed = False
