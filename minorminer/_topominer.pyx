@@ -56,6 +56,9 @@ def topo_embedding(S, T, source_layout, target_layout, **params):
 
     cdef chainmap candidates
     findCandidates(_in.Sg, _in.Tg, _in.Sloc, _in.Tloc, candidates)
+    # NOTE: I would like to allow using either initial_ fixed_ restricted_ suspend_
+    # _in.opts.suspend_chains =  candidates
+    # For now I'm using initial_chains as an example.
     _in.opts.initial_chains =  candidates
 
     cdef vector[int] chain
@@ -157,6 +160,10 @@ cdef class _input_parser:
         self.TL = _read_graph(self.Tg, T)
         if not self.TL:
             raise ValueError("Cannot embed a non-empty source graph into an empty target graph.")
+
+        _get_chainmap(params.get("fixed_chains", ()), self.opts.fixed_chains, self.SL, self.TL, "fixed_chains")
+        _get_chainmap(params.get("initial_chains", ()), self.opts.initial_chains, self.SL, self.TL, "initial_chains")
+        _get_chainmap(params.get("restrict_chains", ()), self.opts.restrict_chains, self.SL, self.TL, "restrict_chains")
 
         _get_locmap(source_layout, self.Sloc, self.SL)
         _get_locmap(target_layout, self.Tloc, self.TL)
