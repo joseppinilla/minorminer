@@ -16,6 +16,6 @@
 
 from __future__ import absolute_import as __absolute_import
 
-from minorminer.minorminer import miner, VARORDER, find_embedding
+from minorminer.minorminer import miner, VARORDER, find_embedding, topo_embedding
 
 from minorminer.package_info import __version__, __author__, __authoremail__, __description__

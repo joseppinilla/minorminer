@@ -1,5 +1,6 @@
 from __future__ import absolute_import as __absolute_import
 from minorminer._minorminer import miner, VARORDER, find_embedding as __find_embedding
+from minorminer._topominer import topo_embedding as __topo_embedding
 from functools import wraps as __wraps
 
 # This wrapper exists to overcome a curious limitation of Cython, and make
@@ -40,4 +41,34 @@ def find_embedding(S, T,
                             fixed_chains=fixed_chains,
                             restrict_chains=restrict_chains,
                             suspend_chains=suspend_chains,
+                            )
+
+@__wraps(__topo_embedding)
+def topo_embedding(S, T, source_layout, target_layout,
+                   max_no_improvement=10,
+                   random_seed=None,
+                   timeout=1000,
+                   max_beta=None,
+                   tries=10,
+                   inner_rounds=None,
+                   chainlength_patience=10,
+                   max_fill=None,
+                   threads=1,
+                   return_overlap=False,
+                   skip_initialization=False,
+                   verbose=0,
+                   ):
+    return __topo_embedding(S, T, source_layout, target_layout,
+                            max_no_improvement=max_no_improvement,
+                            random_seed=random_seed,
+                            timeout=timeout,
+                            max_beta=max_beta,
+                            tries=tries,
+                            inner_rounds=inner_rounds,
+                            chainlength_patience=chainlength_patience,
+                            max_fill=max_fill,
+                            threads=threads,
+                            return_overlap=return_overlap,
+                            skip_initialization=skip_initialization,
+                            verbose=verbose,
                             )

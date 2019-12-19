@@ -64,12 +64,14 @@ class Extension(extension.Extension, object):
 
 ext = '.pyx' if USE_CYTHON else '.cpp'
 
-extensions = [Extension(
-    name="minorminer._minorminer",
-    sources=["./minorminer/_minorminer" + ext],
-    include_dirs=['', './include/'],
-    language='c++',
-)]
+extensions = [Extension(name="minorminer._minorminer",
+              sources=["./minorminer/_minorminer" + ext],
+              include_dirs=['', './include/'],
+              language='c++',),
+              Extension(name="minorminer._topominer",
+              sources=["./minorminer/_topominer" + ext],
+              include_dirs=['', './include/'],
+              language='c++',)]
 
 if USE_CYTHON:
     extensions = cythonize(extensions)

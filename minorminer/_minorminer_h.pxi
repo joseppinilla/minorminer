@@ -8,6 +8,7 @@ ctypedef pair[int,int] intpair
 ctypedef pair[intpair, int] intpairint
 ctypedef map[intpair, int] edgemap
 ctypedef map[int, vector[int]] chainmap
+ctypedef map[int, intpair] locmap
 
 cdef class labeldict(dict):
     cdef list _label
@@ -74,9 +75,9 @@ cdef extern from "../include/chain.hpp" namespace "find_embedding":
 
     cppclass chain:
         chain(vector[int] &w, int l)
-        inline int size() const 
+        inline int size() const
         inline int count(const int q) const
-        inline int get_link(const int x) const 
+        inline int get_link(const int x) const
         inline void set_link(const int x, const int q)
         inline int drop_link(const int x)
         inline void set_root(const int q)
@@ -95,7 +96,7 @@ cdef class cppembedding:
     cdef vector[int] qubit_weights
     def __cinit__(self, int num_vars, int num_qubits):
         pass
-    
+
 
 cdef extern from "../include/util.hpp" namespace "find_embedding":
     cppclass LocalInteraction:
@@ -129,6 +130,8 @@ cdef extern from "../include/util.hpp" namespace "find_embedding":
 cdef extern from "../include/find_embedding.hpp" namespace "find_embedding":
     int findEmbedding(input_graph, input_graph, optional_parameters, vector[vector[int]]&) except +
 
+cdef extern from "../include/find_candidates.hpp" namespace "find_embedding":
+    void findCandidates(input_graph, input_graph, locmap, locmap, chainmap&) except +
 
 cdef extern from "src/pyutil.hpp" namespace "":
     cppclass LocalInteractionPython(LocalInteraction):
