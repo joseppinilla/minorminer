@@ -5,10 +5,11 @@ from libcpp.pair cimport pair
 from libc.stdint cimport uint8_t, uint64_t
 
 ctypedef pair[int,int] intpair
+ctypedef pair[float,float] floatpair
 ctypedef pair[intpair, int] intpairint
 ctypedef map[intpair, int] edgemap
 ctypedef map[int, vector[int]] chainmap
-ctypedef map[int, intpair] locmap
+ctypedef map[int, floatpair] locmap
 
 cdef class labeldict(dict):
     cdef list _label
@@ -131,7 +132,7 @@ cdef extern from "../include/find_embedding.hpp" namespace "find_embedding":
     int findEmbedding(input_graph, input_graph, optional_parameters, vector[vector[int]]&) except +
 
 cdef extern from "../include/find_candidates.hpp" namespace "find_embedding":
-    void findCandidates(input_graph, input_graph, locmap, locmap, chainmap&) except +
+    void findCandidates(input_graph, input_graph, locmap, locmap, intpair, chainmap&) except +
 
 cdef extern from "src/pyutil.hpp" namespace "":
     cppclass LocalInteractionPython(LocalInteraction):

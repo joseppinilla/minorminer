@@ -55,7 +55,7 @@ def topo_embedding(S, T, source_layout, target_layout, **params):
         return {}
 
     cdef chainmap candidates
-    findCandidates(_in.Sg, _in.Tg, _in.Sloc, _in.Tloc, candidates)
+    findCandidates(_in.Sg, _in.Tg, _in.Sloc, _in.Tloc, _in.bins, candidates)
     # NOTE: I would like to allow using either initial_ fixed_ restricted_ suspend_
     # _in.opts.suspend_chains =  candidates
     # For now I'm using initial_chains as an example.
@@ -87,13 +87,14 @@ cdef class _input_parser:
     cdef locmap Sloc, Tloc
     cdef optional_parameters opts
     cdef int pincount
+    cdef intpair bins
     def __init__(self, S, T, source_layout, target_layout, params):
         cdef uint64_t *seed
         cdef object z
 
         self.opts.localInteractionPtr.reset(new LocalInteractionPython())
 
-        names = {"max_no_improvement", "random_seed", "timeout", "max_beta",
+        names = {"bins", "max_no_improvement", "random_seed", "timeout", "max_beta",
                  "tries", "inner_rounds", "chainlength_patience", "max_fill",
                  "threads", "return_overlap", "skip_initialization", "verbose"}
 
@@ -165,6 +166,11 @@ cdef class _input_parser:
         _get_chainmap(params.get("initial_chains", ()), self.opts.initial_chains, self.SL, self.TL, "initial_chains")
         _get_chainmap(params.get("restrict_chains", ()), self.opts.restrict_chains, self.SL, self.TL, "restrict_chains")
 
+        z = params.get("bins")
+        if z is not None:
+            x,y = z
+            self.bins = pair[int,int](x,y)
+
         _get_locmap(source_layout, self.Sloc, self.SL)
         _get_locmap(target_layout, self.Tloc, self.TL)
 
@@ -199,7 +205,7 @@ cdef int _get_locmap(loc, locmap &LMap, L):
     LMap.clear();
     try:
         for x in L:
-            LMap.insert(pair[int,intpair](L[x],loc[x]))
+            LMap.insert(pair[int,floatpair](L[x],loc[x]))
     except KeyError as e:
         raise RuntimeError("All nodes in graph should have locations.")
 
