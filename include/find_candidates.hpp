@@ -24,31 +24,49 @@ TODO:
 
 void findCandidates(graph::input_graph &var_g, graph::input_graph &qubit_g,
                    locmap &Sloc, locmap &Tloc,
-                   intpair bins,
                    chainmap &candidates) {
 
         int num_vars = var_g.num_nodes();
+
         // Fill up bins with qubits with the same location. O(N)
         binmap binning;
         locpair loc;
-        int x_bins = std::get<0>(bins);
-        int y_bins = std::get<1>(bins);
 
+        int columns=0, rows=0;
         for (int u = 0; u < qubit_g.num_nodes(); u++) {
             loc = Tloc[u];
-            float x = std::get<0>(loc)*x_bins;
-            float y = std::get<1>(loc)*y_bins;
+            int x = std::get<0>(loc);
+            int y = std::get<1>(loc);
+
+            if (x > columns) columns = x;
+            if (y > rows) rows = y;
             binning[loc].push_back(u);
+        }
+
+        // Find scale of input graph locaions
+        float xmin=0.0, ymin=0.0;
+        float xmax=0.0, ymax=0.0;
+        for (int u = 0; u < var_g.num_nodes(); u++) {
+            loc = Sloc[u];
+            float x = std::get<0>(loc);
+            float y = std::get<1>(loc);
+
+            if (x < xmin) xmin = x;
+            if (x > xmax) xmax = x;
+            if (y < ymin) ymin = y;
+            if (y > ymax) ymax = y;
         }
 
         // Candidates are qubits in bin that matches
         vector<int> qubits;
         for (int u = 0; u < var_g.num_nodes(); u++) {
             loc = Sloc[u];
+            float x = std::get<0>(loc);
+            float y = std::get<1>(loc);
 
-            float x = std::get<0>(loc)*x_bins;
-            float y = std::get<1>(loc)*y_bins;
-            qubits = binning[loc];
+            int binx = (int)(x-xmin)/(xmax-xmin)*(columns);
+            int biny = (int)(y-ymin)/(ymax-ymin)*(rows);
+            qubits = binning[pair<int,int>(binx,biny)];
             for (int q : qubits) {
               candidates[u].push_back(q);
             }

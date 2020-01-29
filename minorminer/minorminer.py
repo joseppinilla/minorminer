@@ -45,7 +45,6 @@ def find_embedding(S, T,
 
 @__wraps(__topo_embedding)
 def topo_embedding(S, T, source_layout, target_layout,
-                   bins=(16,16),
                    max_no_improvement=10,
                    random_seed=None,
                    timeout=1000,
@@ -60,7 +59,6 @@ def topo_embedding(S, T, source_layout, target_layout,
                    verbose=0,
                    ):
     return __topo_embedding(S, T, source_layout, target_layout,
-                            bins = bins,
                             max_no_improvement=max_no_improvement,
                             random_seed=random_seed,
                             timeout=timeout,

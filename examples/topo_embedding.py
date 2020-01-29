@@ -10,8 +10,7 @@ fig, axs = plt.subplots(2, 2, subplot_kw={'aspect':'equal'})
 plt.subplot(2, 2, 1)
 G = nx.grid_2d_graph(16,16)
 source_bins = {v:v for v in G}
-source_layout = {k:(x/16,y/16) for k, (x,y) in source_bins.items()}
-nx.draw(G, pos=source_layout, node_size=1)
+nx.draw(G, pos=source_bins, node_size=1)
 
 # Non-trivial problem graph
 # plt.subplot(2, 2, 1)
@@ -24,7 +23,6 @@ nx.draw(G, pos=source_layout, node_size=1)
 plt.subplot(2, 2, 2)
 C = dnx.chimera_graph(16, 16, coordinates=True)
 target_bins = {(i,j,u,k):(i,j) for (i,j,u,k) in C}
-target_layout = {k:(x/16,y/16) for k, (x,y) in target_bins.items()}
 dnx.draw_chimera(C, node_size=1)
 
 import time
@@ -46,7 +44,7 @@ plt.title(f"Total: {total} Max: {L[0]}\n t: {end - start:.2f}s")
 # TEMP: Prototype version of topominer maps locations directly. Sloc->Tloc.
 plt.subplot(2, 2, 4)
 start = time.time()
-embedding = minorminer.topo_embedding(G,C,source_layout,target_layout,bins=(4,4))
+embedding = minorminer.topo_embedding(G,C,source_bins,target_bins)
 end = time.time()
 dnx.draw_chimera_embedding(C, embedding, G, node_size=1)
 

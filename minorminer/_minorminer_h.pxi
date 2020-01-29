@@ -132,7 +132,7 @@ cdef extern from "../include/find_embedding.hpp" namespace "find_embedding":
     int findEmbedding(input_graph, input_graph, optional_parameters, vector[vector[int]]&) except +
 
 cdef extern from "../include/find_candidates.hpp" namespace "find_embedding":
-    void findCandidates(input_graph, input_graph, locmap, locmap, intpair, chainmap&) except +
+    void findCandidates(input_graph, input_graph, locmap, locmap, chainmap&) except +
 
 cdef extern from "src/pyutil.hpp" namespace "":
     cppclass LocalInteractionPython(LocalInteraction):
