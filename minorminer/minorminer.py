@@ -2,6 +2,7 @@ from __future__ import absolute_import as __absolute_import
 from minorminer._minorminer import miner, VARORDER, find_embedding as __find_embedding
 from minorminer._topominer import topo_embedding as __topo_embedding
 from functools import wraps as __wraps
+from networkx import spring_layout
 
 # This wrapper exists to overcome a curious limitation of Cython, and make
 # find_embedding friendlier for the inspect module.
@@ -44,7 +45,7 @@ def find_embedding(S, T,
                             )
 
 @__wraps(__topo_embedding)
-def topo_embedding(S, T, source_layout, target_layout,
+def topo_embedding(S, T, source_layout=None, target_layout=None,
                    max_no_improvement=10,
                    random_seed=None,
                    timeout=1000,
@@ -58,6 +59,11 @@ def topo_embedding(S, T, source_layout, target_layout,
                    skip_initialization=False,
                    verbose=0,
                    ):
+    if source_layout is None:
+        source_layout = spring_layout(S,weight=None)
+    if target_layout is None:
+        target_layout = spring_layout(T,weight=None)
+
     return __topo_embedding(S, T, source_layout, target_layout,
                             max_no_improvement=max_no_improvement,
                             random_seed=random_seed,

@@ -44,9 +44,10 @@ void findCandidates(graph::input_graph &var_g, graph::input_graph &qubit_g,
         }
 
         // Find scale of input graph locaions
-        float xmin=0.0, ymin=0.0;
-        float xmax=0.0, ymax=0.0;
-        for (int u = 0; u < var_g.num_nodes(); u++) {
+        locpair loc0 = Sloc[0];
+        float xmin = std::get<0>(loc0), ymin=std::get<1>(loc0);
+        float xmax = std::get<0>(loc0), ymax=std::get<1>(loc0);
+        for (int u = 1; u < var_g.num_nodes(); u++) {
             loc = Sloc[u];
             float x = std::get<0>(loc);
             float y = std::get<1>(loc);
@@ -64,9 +65,9 @@ void findCandidates(graph::input_graph &var_g, graph::input_graph &qubit_g,
             float x = std::get<0>(loc);
             float y = std::get<1>(loc);
 
-            int binx = (int)(x-xmin)/(xmax-xmin)*(columns);
-            int biny = (int)(y-ymin)/(ymax-ymin)*(rows);
-            qubits = binning[pair<int,int>(binx,biny)];
+            float binx = ((x-xmin)/(xmax-xmin))*columns;
+            float biny = ((y-ymin)/(ymax-ymin))*rows;
+            qubits = binning[pair<int,int>((int)binx,(int)biny)];
             for (int q : qubits) {
               candidates[u].push_back(q);
             }

@@ -1,42 +1,60 @@
+import time
 import minorminer
 import networkx as nx
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
 
-fig, axs = plt.subplots(2, 2, subplot_kw={'aspect':'equal'})
-
-# Trivial problem graph
-G = nx.grid_2d_graph(16,16)
-source_bins = {v:v for v in G}
-nx.draw(G, pos=source_bins, node_size=10, ax=axs.flat[0])
+fig, axs = plt.subplots(2, 3, subplot_kw={'aspect':'equal'})
 
 # Target graph
 C = dnx.chimera_graph(16, 16, coordinates=True)
-target_bins = {(i,j,u,k):(i,j) for (i,j,u,k) in C}
-dnx.draw_chimera(C,node_size=10,ax=axs.flat[1])
+nx.draw(C,pos=dnx.chimera_layout(C),node_size=5,ax=axs.flat[0])
 
-import time
-# For Quality Key metrics
+# Trivial problem graph
+G = nx.grid_2d_graph(16,16)
+# Non-exact layout for grid i.e. has overlap
+nx.draw(G,pos=nx.spring_layout(G,seed=16),node_size=5,ax=axs.flat[1])
+# Exact layout
+nx.draw(G,pos={v:v for v in G},node_size=5,ax=axs.flat[2])
+
+# For quality metrics
 miner = minorminer.miner(G,C)
 
-# Minorminer
+########################### Minorminer
 start = time.time()
 embedding = minorminer.find_embedding(G, C)
 end = time.time()
-dnx.draw_chimera_embedding(C, embedding, G, node_size=1, ax=axs.flat[2])
+dnx.draw_chimera_embedding(C, embedding, G, node_size=5, ax=axs.flat[3])
 
 state, O, L = miner.quality_key(embedding,embedded=True)
-
 total = sum([L[i]*L[i+1] for i in range(0,len(L),2)])
-print(f"Total: {total} Max: {L[0]} t: {end - start:.2f}s")
+print("Layout-Agnostic: Total: %d Max: %d t: %.2fs" % (total,L[0],end - start))
 
-# Topominer
-# TEMP: Prototype version of topominer maps locations directly. Sloc->Tloc.
+########################### Topominer w/ non-exact layout
 start = time.time()
-embedding = minorminer.topo_embedding(G,C,source_bins,target_bins)
+# Measure time of finding layout as part of algorithm
+source_layout = nx.spring_layout(G,seed=16)
+# NOTE: target_layout must be (int,int) for now. Using Chimera tile.
+target_layout = {(i,j,u,k):(i,j) for (i,j,u,k) in C}
+embedding = minorminer.topo_embedding(G,C,source_layout,target_layout)
 end = time.time()
-dnx.draw_chimera_embedding(C, embedding, G, node_size=1, ax=axs.flat[3])
+dnx.draw_chimera_embedding(C,embedding,G,node_size=5,ax=axs.flat[4])
 
 state, O, L = miner.quality_key(embedding,embedded=True)
 total = sum([L[i]*L[i+1] for i in range(0,len(L),2)])
-print(f"Total: {total} Max: {L[0]} t: {end - start:.2f}s")
+print("Layout-Aware Spring: Total: %d Max: %d t: %.2fs" % (total,L[0],end - start))
+
+########################### Topominer w/ exact layout
+start = time.time()
+source_layout = {v:v for v in G}
+target_layout = {(i,j,u,k):(i,j) for (i,j,u,k) in C}
+embedding = minorminer.topo_embedding(G,C,source_layout,target_layout)
+end = time.time()
+dnx.draw_chimera_embedding(C,embedding,G,node_size=5,ax=axs.flat[5])
+
+state, O, L = miner.quality_key(embedding,embedded=True)
+total = sum([L[i]*L[i+1] for i in range(0,len(L),2)])
+print("Layout-Aware Exact: Total: %d Max: %d t: %.2fs" % (total,L[0],end - start))
+
+plt.tight_layout()
+plt.show()
