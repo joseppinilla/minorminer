@@ -26,12 +26,12 @@ def topo_embedding(S, T, source_layout, target_layout, **params):
         T: an iterable of label pairs representing the edges in the target graph, or a NetworkX Graph
 
         source_layout: Dictionary of 2D locations of nodes in source
-            graph. Values should be len-2 numpy.ndarray x,y = [-1.0, 1.0]. If
-            not given topo_embedding creates an artificial layout.
+            graph. Values should be len-2 numpy.ndarray x,y = [-1.0, 1.0].
+            TODO: If not given, topo_embedding creates an artificial layout.
 
         target_layout: Dictionary of 2D locations of nodes in target
-            graph. Values should be len-2 numpy.ndarray x,y = [-1.0, 1.0]. If
-            not given topo_embedding creates an artificial layout.
+            graph. Values should be len-2 numpy.ndarray x,y = [-1.0, 1.0].
+            TODO: If not given, topo_embedding creates an artificial layout.
 
         **params (optional): see 'minorminer'
 
