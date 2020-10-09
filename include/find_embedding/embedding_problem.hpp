@@ -1,3 +1,17 @@
+// Copyright 2017 - 2020 D-Wave Systems Inc.
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//
+//        http://www.apache.org/licenses/LICENSE-2.0
+//
+//    Unless required by applicable law or agreed to in writing, software
+//    distributed under the License is distributed on an "AS IS" BASIS,
+//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//    See the License for the specific language governing permissions and
+//    limitations under the License.
+
 #pragma once
 
 #include <algorithm>
@@ -56,7 +70,7 @@ class domain_handler_masked {
   public:
     domain_handler_masked(optional_parameters &p, int n_v, int n_f, int n_q, int n_r)
             : params(p), masks(n_v + n_f, vector<int>()) {
-#ifndef NDEBUG
+#ifdef CPPDEBUG
         for (auto &vC : params.restrict_chains)
             for (auto &q : vC.second) minorminer_assert(0 <= q && q < n_q + n_r);
 #endif
@@ -140,11 +154,12 @@ class fixed_handler_hival {
 //! the errors-only handler and otherwise, the full handler
 
 //! Here's the full output handler
-class output_handler_full {
+template <bool verbose>
+class output_handler {
     optional_parameters &params;
 
   public:
-    output_handler_full(optional_parameters &p) : params(p) {}
+    output_handler(optional_parameters &p) : params(p) {}
 
     //! printf regardless of the verbosity level
     template <typename... Args>
@@ -155,56 +170,33 @@ class output_handler_full {
     //! printf at the major_info verbosity level
     template <typename... Args>
     void major_info(const char *format, Args... args) const {
-        params.major_info(format, args...);
+        if (verbose && params.verbose > 0) params.major_info(format, args...);
     }
 
     //! print at the minor_info verbosity level
     template <typename... Args>
     void minor_info(const char *format, Args... args) const {
-        params.minor_info(format, args...);
+        if (verbose && params.verbose > 1) params.minor_info(format, args...);
     }
 
     //! print at the extra_info verbosity level
     template <typename... Args>
     void extra_info(const char *format, Args... args) const {
-        params.extra_info(format, args...);
+        if (verbose && params.verbose > 2) params.extra_info(format, args...);
     }
 
     //! print at the debug verbosity level (only works when `CPPDEBUG` is set)
     template <typename... Args>
-    void debug(const char *ONDEBUG(format), Args... ONDEBUG(args)) const {
-        ONDEBUG(params.debug(format, args...));
+#ifdef CPPDEBUG
+    void debug(const char *format, Args... args) const {
+        if (verbose && params.verbose > 3) {
+            params.debug(format, args...);
+        }
     }
-};
-
-//! Here's the errors-only handler
-class output_handler_error {
-    optional_parameters &params;
-
-  public:
-    output_handler_error(optional_parameters &p) : params(p) {}
-
-    //! printf regardless of the verbosity level
-    template <typename... Args>
-    void error(const char *format, Args... args) const {
-        params.error(format, args...);
+#else
+    void debug(const char * /*format*/, Args... /*args*/) const {
     }
-
-    //! printf at the major_info verbosity level
-    template <typename... Args>
-    void major_info(Args...) const {}
-
-    //! print at the minor_info verbosity level
-    template <typename... Args>
-    void minor_info(Args...) const {}
-
-    //! print at the extra_info verbosity level
-    template <typename... Args>
-    void extra_info(Args...) const {}
-
-    //! print at the debug verbosity level (only works when `CPPDEBUG` is set)
-    template <typename... Args>
-    void debug(Args...) const {}
+#endif
 };
 
 struct shuffle_first {};
@@ -264,7 +256,7 @@ class embedding_problem_base {
         if (ultramax_weight < 2) throw MinorMinerException("problem is too large to avoid overflow");
 
         if (ultramax_weight < params.max_fill)
-            weight_bound = std::floor(ultramax_weight);
+            weight_bound = static_cast<int>(std::floor(ultramax_weight));
         else
             weight_bound = params.max_fill;
 
@@ -276,12 +268,12 @@ class embedding_problem_base {
 
   private:
     //! computes an upper bound on the distances computed during tearout & replace
-    unsigned int compute_margin() {
+    size_t compute_margin() {
         if (num_q == 0) return 0;
-        unsigned int max_degree =
-                std::max_element(begin(var_nbrs), end(var_nbrs), [](const vector<int> &a, const vector<int> &b) {
-                    return a.size() < b.size();
-                })->size();
+        size_t max_degree =
+                std::max_element(begin(var_nbrs), end(var_nbrs),
+                                 [](const vector<int> &a, const vector<int> &b) { return a.size() < b.size(); })
+                        ->size();
         if (max_degree == 0)
             return num_q;
         else
@@ -297,7 +289,7 @@ class embedding_problem_base {
         double base = min(exp2(log2base), min(max_beta, round_beta));
         double power = 1;
         for (int i = 0; i <= max_weight; i++) {
-            weight_table[i] = power;
+            weight_table[i] = static_cast<distance_t>(power);
             power *= base;
         }
         for (int i = max_weight + 1; i < 64; i++) weight_table[i] = max_distance;
@@ -324,7 +316,7 @@ class embedding_problem_base {
     //! transposition before returning the reference
     const vector<int> &var_neighbors(int u, rndswap_first) {
         if (var_nbrs[u].size() > 2) {
-            int i = randint(0, var_nbrs[u].size() - 2);
+            size_t i = randint(0, var_nbrs[u].size() - 2);
             std::swap(var_nbrs[u][i], var_nbrs[u][i + 1]);
         } else if (var_nbrs[u].size() == 2) {
             if (randint(0, 1)) std::swap(var_nbrs[u][0], var_nbrs[u][1]);
@@ -395,7 +387,8 @@ class embedding_problem_base {
                                                           var_order_shuffle);
                             break;
                         default:
-                            throw - 1;
+                            // this should be unreachable...
+                            throw CorruptParametersException("unsupported variable ordering specified");
                     }
         }
         return var_order_space;
@@ -408,7 +401,7 @@ class embedding_problem_base {
         visited[x] = 1;
         while (front < component.size()) {
             int x = component[front++];
-            unsigned int lastback = component.size();
+            size_t lastback = component.size();
             for (auto &y : neighbors[x]) {
                 if (!visited[y]) {
                     visited[y] = 1;
@@ -489,4 +482,4 @@ class embedding_problem : public embedding_problem_base,
               output_handler(p) {}
     virtual ~embedding_problem() {}
 };
-}
+}  // namespace find_embedding

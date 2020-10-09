@@ -1,3 +1,17 @@
+# Copyright 2017 - 2020 D-Wave Systems Inc.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+
 # distutils: language = c++
 # cython: language_level=2
 # Note: chosing to use language_level=2 because of how `enum VARORDER` is exposed
@@ -43,7 +57,7 @@ This implementation adds several useful features:
 [1] https://arxiv.org/abs/1406.2741
 """
 include "_minorminer_h.pxi"
-import os
+import os as _os, logging as _logging
 
 def find_embedding(S, T, **params):
     """
@@ -157,6 +171,14 @@ def find_embedding(S, T, **params):
                 max chain length: largest number of qubits representing a single variable
                 num max chains: the number of variables that has max chain size
 
+        interactive: If `logging` is None or False, the verbose output will be printed
+            to stdout/stderr as appropriate, and keyboard interrupts will stop the embedding
+            process and the current state will be returned to the user.  Otherwise, output
+            will be directed to the logger `logging.getLogger(minorminer.__name__)` and
+            keyboard interrupts will be propagated back to the user.  Errors will use 
+            `logger.error()`, verbosity levels 1 through 3 will use `logger.info()` and level
+            4 will use `logger.debug()`.  bool, default False
+
         initial_chains: Initial chains inserted into an embedding before
             fixed_chains are placed, which occurs before the initialization
             pass. These can be used to restart the algorithm in a similar state
@@ -168,8 +190,9 @@ def find_embedding(S, T, **params):
 
         fixed_chains: Fixed chains inserted into an embedding before the
             initialization pass. As the algorithm proceeds, these chains are not
-            allowed to change. Missing or empty entries are ignored. A
-            dictionary, where fixed_chains[i] is a list of qubit labels.
+            allowed to change, and the qubits used by these chains are not used by
+            other chains. Missing or empty entries are ignored. A dictionary, where
+            fixed_chains[i] is a list of qubit labels.
 
         restrict_chains: Throughout the algorithm, we maintain the condition
             that chain[i] is a subset of restrict_chains[i] for each i, except
@@ -219,6 +242,14 @@ def find_embedding(S, T, **params):
 class EmptySourceGraphError(RuntimeError):
     pass
 
+cdef void wrap_logger(void *logger, int loglevel, const string &msg):
+    if loglevel == 0:
+        (<object>logger).error(msg.rstrip())
+    elif 1 <= loglevel < 4:
+        (<object>logger).info(msg.rstrip())
+    else:
+        (<object>logger).debug(msg.rstrip())
+
 cdef class _input_parser:
     cdef input_graph Sg, Tg
     cdef labeldict SL, TL
@@ -228,16 +259,24 @@ cdef class _input_parser:
         cdef uint64_t *seed
         cdef object z
 
-        self.opts.localInteractionPtr.reset(new LocalInteractionPython())
-
         names = {"max_no_improvement", "random_seed", "timeout", "tries", "verbose",
                  "fixed_chains", "initial_chains", "max_fill", "chainlength_patience",
                  "return_overlap", "skip_initialization", "inner_rounds", "threads",
-                 "restrict_chains", "suspend_chains", "max_beta"}
+                 "restrict_chains", "suspend_chains", "max_beta", "interactive"}
 
         for name in params:
             if name not in names:
                 raise ValueError("%s is not a valid parameter for find_embedding"%name)
+
+        z = params.get("interactive")
+        if z is None or not z:
+            self.opts.interactive = 0
+            z = _logging.getLogger(__name__)
+            self.opts.localInteractionPtr.reset(
+                new LocalInteractionLogger(wrap_logger, <void *>z))
+        else:
+            self.opts.interactive = 1
+            self.opts.localInteractionPtr.reset(new LocalInteractionPython())
 
         z = params.get("max_no_improvement")
         if z is not None:
@@ -255,7 +294,7 @@ cdef class _input_parser:
         if z is not None:
             self.opts.seed( long(z) )
         else:
-            seed_obj = os.urandom(sizeof(uint64_t))
+            seed_obj = _os.urandom(sizeof(uint64_t))
             seed = <uint64_t *>(<void *>(<uint8_t *>(seed_obj)))
             self.opts.seed(seed[0])
 
@@ -600,10 +639,20 @@ cdef int _get_chainmap(C, chainmap &CMap, SL, TL, parameter) except -1:
 
 cdef _read_graph(input_graph &g, E):
     cdef labeldict L = labeldict()
+    cdef bool nodescan = False
+    cdef int i, last
     if hasattr(E, 'edges'):
+        G = E
         E = E.edges()
-    for a,b in E:
+        nodescan = True
+    for a, b in E:
         g.push_back(L[a],L[b])
+    if nodescan:
+        last = len(L)
+        for a in G.nodes():
+            L[a]
+        for i in range(last, len(L)):
+            g.push_back(i, i)
     return L
 
 __all__ = ["find_embedding", "VARORDER", "miner"]

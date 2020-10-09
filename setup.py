@@ -28,18 +28,30 @@ else:
     exec(open(path_to_package_info).read())
 
 extra_compile_args = {
-    'msvc': ['/std:c++latest', '/MT', '/EHsc'],
-    'unix': ['-std=c++11', '-Wextra', '-Wno-format-security', '-Ofast', '-fomit-frame-pointer', '-DNDEBUG', '-fno-rtti'],
+    'msvc': {
+        'c++': ['/std:c++latest', '/MT', '/EHsc'],
+        'c': [],
+    },
+    'unix': {
+        'c++': ['-std=c++11', '-Wall', '-Wno-format-security', '-Ofast', '-fomit-frame-pointer', '-DNDEBUG', '-fno-rtti'],
+        'c': ['-std=c99', '-Wall', '-Wno-format-security', '-Ofast', '-fomit-frame-pointer', '-DNDEBUG'],
+    },
 }
 
 extra_link_args = {
-    'msvc': [],
-    'unix': ['-std=c++11'],
+    'msvc': {'c++': [], 'c': []},
+    'unix': {
+        'c++': ['-std=c++11'],
+        'c': ['-std=c99'],
+    },
 }
 
+
 if '--debug' in sys.argv or '-g' in sys.argv or 'CPPDEBUG' in os.environ:
-    extra_compile_args['msvc'].append('/DCPPDEBUG')
-    extra_compile_args['unix'] = ['-std=c++1y', '-w',
+    extra_compile_args['msvc']['c++'].append('/DCPPDEBUG')
+    extra_compile_args['unix']['c++'] = ['-std=c++1y', '-Wall',
+                                  '-O0', '-g', '-fipa-pure-const', '-DCPPDEBUG']
+    extra_compile_args['unix']['c'] = ['-std=c99', '-Wall',
                                   '-O0', '-g', '-fipa-pure-const', '-DCPPDEBUG']
 
 
@@ -49,11 +61,11 @@ class build_ext_compiler_check(build_ext):
 
         compile_args = extra_compile_args[compiler]
         for ext in self.extensions:
-            ext.extra_compile_args = compile_args
+            ext.extra_compile_args = compile_args[ext.language]
 
-        link_args = extra_compile_args[compiler]
+        link_args = extra_link_args[compiler]
         for ext in self.extensions:
-            ext.extra_compile_args = link_args
+            ext.extra_link_args = link_args[ext.language]
 
         build_ext.build_extensions(self)
 
@@ -64,33 +76,55 @@ class Extension(extension.Extension, object):
 
 ext = '.pyx' if USE_CYTHON else '.cpp'
 
-extensions = [Extension(name="minorminer._minorminer",
-              sources=["./minorminer/_minorminer" + ext],
-              include_dirs=['', './include/'],
-              language='c++',),
-              Extension(name="minorminer._topominer",
-              sources=["./minorminer/_topominer" + ext],
-              include_dirs=['', './include/'],
-              language='c++',)]
+extensions = [
+    Extension(name="minorminer._minorminer",
+        sources=["./minorminer/_minorminer" + ext],
+        include_dirs=['', './include/', './include/find_embedding'],
+        language='c++',
+    ),
+  
+    Extension(name="minorminer._topominer",
+        sources=["./minorminer/_topominer" + ext],
+        include_dirs=['', './include/'],
+        language='c++',),
+
+    Extension(
+        name="minorminer.busclique",
+        sources=["./minorminer/busclique" + ext],
+        include_dirs=['', './include/', '.include/busclique'],
+        language='c++',
+    ),
+
+]
 
 if USE_CYTHON:
     extensions = cythonize(extensions)
+
+#borrowed from rectangle-packer
+extensions.append(
+    Extension('minorminer._rpack',
+              sources=['rectangle-packer/src/rpack.c',
+                       'rectangle-packer/src/areapack.c',
+                       'rectangle-packer/src/taskpack.c'],
+              include_dirs=['rectangle-packer/include'],
+              language='c')
+)
 
 os.environ["MACOSX_DEPLOYMENT_TARGET"] = platform.mac_ver()[0]
 
 classifiers = [
     'License :: OSI Approved :: Apache Software License',
     'Operating System :: OS Independent',
-    'Programming Language :: Python :: 2',
-    'Programming Language :: Python :: 2.7',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.4',
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
 ]
 
-python_requires = '>=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*'
+python_requires = '>=3.5'
+install_requires = [
+    "scipy", "networkx", "dwave-networkx", "numpy", "fasteners", "homebase"
+]
 
 setup(
     name="minorminer",
@@ -102,8 +136,10 @@ setup(
     version=__version__,
     license="Apache 2.0",
     ext_modules=extensions,
-    packages=['minorminer'],
+    packages=['minorminer',
+              'minorminer.layout'],
     classifiers=classifiers,
     python_requires=python_requires,
+    install_requires=install_requires,
     cmdclass={'build_ext': build_ext_compiler_check}
 )

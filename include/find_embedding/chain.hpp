@@ -1,3 +1,17 @@
+// Copyright 2017 - 2020 D-Wave Systems Inc.
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//
+//        http://www.apache.org/licenses/LICENSE-2.0
+//
+//    Unless required by applicable law or agreed to in writing, software
+//    distributed under the License is distributed on an "AS IS" BASIS,
+//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//    See the License for the specific language governing permissions and
+//    limitations under the License.
+
 #pragma once
 #include <iostream>
 #include "util.hpp"
@@ -5,13 +19,13 @@
 namespace find_embedding {
 
 #ifdef CPPDEBUG
-#define DIAGNOSE2(other, X) \
-    diagnostic(X);          \
-    other.diagnostic(X);
-#define DIAGNOSE(X) diagnostic(X);
+#define DIAGNOSE_CHAINS(other) \
+    diagnostic();              \
+    other.diagnostic();
+#define DIAGNOSE_CHAIN() diagnostic();
 #else
-#define DIAGNOSE2(other, X)
-#define DIAGNOSE(X)
+#define DIAGNOSE_CHAINS(other)
+#define DIAGNOSE_CHAIN()
 #endif
 
 //! This class stores chains for embeddings, and performs qubit-use
@@ -78,10 +92,10 @@ class chain {
         clear();
         for (auto &q : c) {
             data.emplace(q, pair<int, int>(q, 1));
-            minorminer_assert(0 <= q && q < qubit_weight.size());
+            minorminer_assert(0 <= q && q < static_cast<int>(qubit_weight.size()));
             qubit_weight[q]++;
         }
-        DIAGNOSE("operator=vector");
+        DIAGNOSE_CHAIN();
         return *this;
     }
 
@@ -91,15 +105,15 @@ class chain {
         data = c.data;
         for (auto &q : c) qubit_weight[q]++;
         links = c.links;
-        DIAGNOSE("operator=chain");
+        DIAGNOSE_CHAIN();
         return *this;
     }
 
     //! number of qubits in chain
-    inline int size() const { return data.size(); }
+    inline size_t size() const { return data.size(); }
 
     //! returns 0 if `q` is not contained in `this`, 1 otherwise
-    inline int count(const int q) const { return data.count(q); }
+    inline size_t count(const int q) const { return data.count(q); }
 
     //! get the qubit, in `this`, which links `this` to the chain of x
     //!(if x==label, interpret the linking qubit as the chain's root)
@@ -119,7 +133,7 @@ class chain {
         links[x] = q;
 
         retrieve(q).second++;
-        DIAGNOSE("set_link");
+        DIAGNOSE_CHAIN();
     }
 
     //! discard and return the linking qubit for `x`, or -1 if that link is not set
@@ -132,7 +146,7 @@ class chain {
             retrieve(q).second--;
             links.erase(z);
         }
-        DIAGNOSE("drop_link");
+        DIAGNOSE_CHAIN();
         return q;
     }
 
@@ -144,7 +158,7 @@ class chain {
         links.emplace(label, q);
         data.emplace(q, pair<int, int>(q, 2));
         qubit_weight[q]++;
-        DIAGNOSE("set_root");
+        DIAGNOSE_CHAIN();
     }
 
     //! empty this data structure
@@ -152,7 +166,7 @@ class chain {
         for (auto &q : *this) qubit_weight[q]--;
         data.clear();
         links.clear();
-        DIAGNOSE("clear");
+        DIAGNOSE_CHAIN();
     }
 
     //! add the qubit `q` as a leaf, with `parent` as its parent
@@ -162,7 +176,7 @@ class chain {
         data.emplace(q, pair<int, int>(parent, 0));
         qubit_weight[q]++;
         retrieve(parent).second++;
-        DIAGNOSE("add_leaf");
+        DIAGNOSE_CHAIN();
     }
 
     //! try to delete the qubit `q` from this chain, and keep
@@ -176,7 +190,7 @@ class chain {
             p = trim_leaf(q);
         }
         minorminer_assert(data.count(q) == 1);
-        DIAGNOSE("trim_branch");
+        DIAGNOSE_CHAIN();
         return q;
     }
 
@@ -192,7 +206,7 @@ class chain {
             data.erase(z);
             q = p.first;
         }
-        DIAGNOSE("trim_leaf");
+        DIAGNOSE_CHAIN();
         return q;
     }
 
@@ -216,7 +230,7 @@ class chain {
         Q.second--;
         P.second++;
         minorminer_assert(parent(q) == p);
-        DIAGNOSE("adopt");
+        DIAGNOSE_CHAIN();
     }
 
     //! return the number of references that `this` makes to the qubit
@@ -229,13 +243,13 @@ class chain {
 
     //! store this chain into a `frozen_chain`, unlink all chains from
     //! this, and clear()
-    inline int freeze(vector<chain> &others, frozen_chain &keep) {
+    inline size_t freeze(vector<chain> &others, frozen_chain &keep) {
         keep.clear();
         for (auto &v_p : links) {
             keep.links.emplace(v_p);
             int v = v_p.first;
             if (v != label) {
-                minorminer_assert(0 <= v && v < others.size());
+                minorminer_assert(0 <= v && v < static_cast<int>(others.size()));
                 int q = others[v].drop_link(label);
                 keep.links.emplace(-v - 1, q);
             }
@@ -244,7 +258,7 @@ class chain {
         for (auto &q : *this) qubit_weight[q]--;
         keep.data.swap(data);
         minorminer_assert(size() == 0);
-        DIAGNOSE("freeze");
+        DIAGNOSE_CHAIN();
         return keep.data.size();
     }
 
@@ -260,11 +274,11 @@ class chain {
                 links.emplace(v_p);
             } else {
                 v = -v - 1;
-                minorminer_assert(0 <= v && v < others.size());
+                minorminer_assert(0 <= v && v < static_cast<int>(others.size()));
                 others[v].set_link(label, v_p.second);
             }
         }
-        DIAGNOSE("thaw");
+        DIAGNOSE_CHAIN();
     }
 
     //! assumes `this` and `other` have links for eachother's labels
@@ -279,7 +293,7 @@ class chain {
         minorminer_assert(q != -1);
         minorminer_assert(p != -1);
 
-        while ((chainsize == 0 || size() < chainsize) && ep.accepts_qubit(label, p)) {
+        while ((chainsize == 0 || static_cast<int>(size()) < chainsize) && ep.accepts_qubit(label, p)) {
             int r = other.trim_leaf(p);
             minorminer_assert(other.size() >= 1);
             if (r == p) break;
@@ -307,7 +321,7 @@ class chain {
 
         set_link(other.label, q);
         other.set_link(label, p);
-        DIAGNOSE2(other, "steal");
+        DIAGNOSE_CHAINS(other);
     }
 
     //! link this chain to another, following the path
@@ -337,7 +351,7 @@ class chain {
         minorminer_assert(count(q) == 1);
         set_link(other.label, q);
         other.set_link(label, p);
-        DIAGNOSE2(other, "link_path");
+        DIAGNOSE_CHAINS(other);
     }
 
     class iterator {
@@ -358,20 +372,19 @@ class chain {
     iterator end() const { return iterator(data.end()); };
 
     //! run the diagnostic, and if it fails, report the failure to the user
-    //! and throw -1.  the `last_op` argument is used in the error message
-    inline void diagnostic(char *last_op) {
+    //! and throw a CorruptEmbeddingException.  the `last_op` argument is
+    //! used in the error message
+    inline void diagnostic() {
 #ifdef CPPDEBUG
         if (belay_diagnostic) return;
 #endif
-        int r = run_diagnostic();
-
-        if (r) {
-            std::cout << "chain diagnostic failures on var " << label << ":";
-            if (r & 1) std::cout << " (parent containment)";
-            if (r & 2) std::cout << " (refcount)";
-
-            std::cout << ".  last operation was " << last_op << std::endl;
-            throw - 1;
+        switch (run_diagnostic()) {
+            case 1:
+                throw CorruptEmbeddingException("Qubit containment errors found in chain diagnostics.");
+            case 2:
+                throw CorruptEmbeddingException("Parent errors found in chain diagnostics.");
+            case 3:
+                throw CorruptEmbeddingException("Multiple errors found in chain diagnostics.");
         }
     }
 
@@ -405,4 +418,4 @@ class chain {
     //! non-const unsafe data accessor
     inline pair<int, int> &retrieve(int q) { return (*data.find(q)).second; }
 };
-}
+}  // namespace find_embedding

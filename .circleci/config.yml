@@ -110,7 +110,7 @@ jobs:
 
       - restore_cache: &restore-cache-template
           keys:
-          - v1-dependencies-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          - v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
 
       - run:
           name: create virtualenv
@@ -122,12 +122,12 @@ jobs:
           command: |
             . env/bin/activate
             python --version
-            pip install -r tests/requirements.txt
+            pip install -r requirements.txt -r tests/requirements.txt
 
       - save_cache: &save-cache-template
           paths:
             - ./env
-          key: v1-dependencies-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
+          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "tests/requirements.txt" }}-{{ .Environment.CIRCLE_JOB }}
 
       - run: &build-ext-template
           name: install package
@@ -183,16 +183,6 @@ jobs:
     docker:
       - image: circleci/python:3.5-jessie
 
-  test-3.4:
-    <<: *full-test-template
-    docker:
-      - image: circleci/python:3.4-jessie
-
-  test-2.7:
-    <<: *full-test-template
-    docker:
-      - image: circleci/python:2.7-jessie
-
   test-osx-3.8: &osx-tests-template
     macos:
       xcode: "11.2.0"
@@ -234,19 +224,50 @@ jobs:
             python -m pip install virtualenv
             python -m virtualenv env
 
-      - run: *install-dependencies-template
+      - run:
+          name: install dependencies
+          command: |
+            eval "$(pyenv init -)"
+            python --version
+            pip install -r requirements.txt -r tests/requirements.txt
 
       - save_cache: *save-cache-template
 
-      - run: *build-ext-template
+      - run:
+          name: install package
+          command: |
+            eval "$(pyenv init -)"
+            python setup.py build_ext --inplace
         
-      - run: *run-tests-template
+      - run:
+          name: run unittests
+          command: |
+            eval "$(pyenv init -)"
+            python --version
+            python -m nose . --exe
+          environment:
+            CPPDEBUG: 1
 
-      - run: *sdist-build-template
+      - run:
+          name: build sdist
+          command: |
+            eval "$(pyenv init -)"
+            python setup.py sdist
 
-      - run: *sdist-install-template
 
-      - run: *sdist-cython-install-template
+      - run: 
+          name: install sdist without cython
+          command: |
+            eval "$(pyenv init -)"
+            pyenv local $PYTHON
+            pip install dist/minorminer-*.tar.gz
+
+      - run:
+          name: install sdist with cython
+          command: |
+            eval "$(pyenv init -)"
+            pip install cython
+            pip install dist/minorminer-*.tar.gz
 
   test-osx-3.7:
     <<: *osx-tests-template
@@ -266,18 +287,6 @@ jobs:
       PYTHON: 3.5.5
       HOMEBREW_NO_AUTO_UPDATE: 1
 
-  test-osx-3.4:
-    <<: *osx-tests-template
-    environment:
-      PYTHON: 3.4.8
-      HOMEBREW_NO_AUTO_UPDATE: 1
-
-  test-osx-2.7:
-    <<: *osx-tests-template
-    environment:
-      PYTHON: 2.7.15
-      HOMEBREW_NO_AUTO_UPDATE: 1
-
   deploy-manylinux-64: &manylinux-template
     docker:
       - image: quay.io/pypa/manylinux1_x86_64
@@ -291,7 +300,8 @@ jobs:
           name: build wheels
           command: |
             for PYBIN in /opt/python/*/bin; do
-              "${PYBIN}/pip" install -r tests/requirements.txt
+              if "${PYBIN}/python" -c "import sys; sys.exit(sys.version_info>=(3, 5) and sys.version_info<(3, 9))"; then continue; fi;
+              "${PYBIN}/pip" install -r requirements.txt -r tests/requirements.txt
               "${PYBIN}/pip" wheel . -w ./wheelhouse
               "${PYBIN}/python" setup.py sdist -d ./dist
             done
@@ -408,18 +418,6 @@ jobs:
       PYTHON: 3.5.5
       HOMEBREW_NO_AUTO_UPDATE: 1
 
-  deploy-osx-3.4:
-    <<: *osx-deploy-template
-    environment:
-      PYTHON: 3.4.8
-      HOMEBREW_NO_AUTO_UPDATE: 1
-
-  deploy-osx-2.7:
-    <<: *osx-deploy-template
-    environment:
-      PYTHON: 2.7.15
-      HOMEBREW_NO_AUTO_UPDATE: 1
-
 workflows:
   version: 2
   test:
@@ -431,15 +429,11 @@ workflows:
       - test-3.8
       - test-3.7
       - test-3.6
-      - test-2.7
       - test-3.5
-      - test-3.4
       - test-osx-3.8
       - test-osx-3.7
       - test-osx-3.6
       - test-osx-3.5
-      - test-osx-3.4
-      - test-osx-2.7
   deploy:
     jobs:
       - deploy-manylinux-64:
@@ -473,18 +467,6 @@ workflows:
             branches:
               ignore: /.*/
       - deploy-osx-3.5:
-          filters:
-            tags:
-              only: /^[0-9]+(\.[0-9]+)*(\.dev([0-9]+)?)?$/
-            branches:
-              ignore: /.*/
-      - deploy-osx-3.4:
-          filters:
-            tags:
-              only: /^[0-9]+(\.[0-9]+)*(\.dev([0-9]+)?)?$/
-            branches:
-              ignore: /.*/
-      - deploy-osx-2.7:
           filters:
             tags:
               only: /^[0-9]+(\.[0-9]+)*(\.dev([0-9]+)?)?$/

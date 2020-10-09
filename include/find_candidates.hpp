@@ -2,8 +2,8 @@
 
 #include <iostream>
 
-#include "util.hpp"
-#include "graph.hpp"
+#include "./find_embedding/util.hpp"
+#include "./find_embedding/graph.hpp"
 
 namespace find_embedding {
 

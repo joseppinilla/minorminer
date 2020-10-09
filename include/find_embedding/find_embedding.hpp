@@ -1,3 +1,17 @@
+// Copyright 2017 - 2020 D-Wave Systems Inc.
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//
+//        http://www.apache.org/licenses/LICENSE-2.0
+//
+//    Unless required by applicable law or agreed to in writing, software
+//    distributed under the License is distributed on an "AS IS" BASIS,
+//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//    See the License for the specific language governing permissions and
+//    limitations under the License.
+
 #pragma once
 
 #include <algorithm>
@@ -84,9 +98,9 @@ class parameter_processor {
     }
 
     vector<int> _inverse_permutation(vector<int> &f) {
-        int n = f.size();
+        size_t n = f.size();
         vector<int> r(n);
-        for (int i = n; i--;) {
+        for (size_t i = n; i--;) {
             r.at(f[i]) = i;
         }
         return r;
@@ -121,7 +135,7 @@ class pathfinder_type {
     typedef typename std::conditional<fixed, fixed_handler_hival, fixed_handler_none>::type fixed_handler_t;
     typedef typename std::conditional<restricted, domain_handler_masked, domain_handler_universe>::type
             domain_handler_t;
-    typedef typename std::conditional<verbose, output_handler_full, output_handler_error>::type output_handler_t;
+    typedef output_handler<verbose> output_handler_t;
     typedef embedding_problem<fixed_handler_t, domain_handler_t, output_handler_t> embedding_problem_t;
     typedef typename std::conditional<parallel, pathfinder_parallel<embedding_problem_t>,
                                       pathfinder_serial<embedding_problem_t>>::type pathfinder_t;
@@ -168,10 +182,10 @@ class pathfinder_wrapper {
 
     template <bool parallel, bool fixed, bool restricted, typename... Args>
     inline std::unique_ptr<pathfinder_public_interface> _pf_parse3(Args &&... args) {
-        if (pp.params.verbose > 0)
-            return _pf_parse4<parallel, fixed, restricted, true>(std::forward<Args>(args)...);
-        else
+        if (pp.params.verbose <= 0)
             return _pf_parse4<parallel, fixed, restricted, false>(std::forward<Args>(args)...);
+        else
+            return _pf_parse4<parallel, fixed, restricted, true>(std::forward<Args>(args)...);
     }
 
     template <bool parallel, bool fixed, typename... Args>
@@ -222,7 +236,7 @@ int findEmbedding(graph::input_graph &var_g, graph::input_graph &qubit_g, option
 
     if (params.return_overlap || success) {
         chains.resize(var_g.num_nodes());
-        for (int u = 0; u < var_g.num_nodes(); u++) {
+        for (size_t u = 0; u < var_g.num_nodes(); u++) {
             pf.get_chain(u, chains[u]);
         }
     } else {
@@ -231,4 +245,4 @@ int findEmbedding(graph::input_graph &var_g, graph::input_graph &qubit_g, option
 
     return success;
 }
-}
+}  // namespace find_embedding

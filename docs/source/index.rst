@@ -1,5 +1,5 @@
 
-.. include:: ../../README.rst
+.. include:: README.rst
   :start-after: index-start-marker
   :end-before: index-end-marker
 
@@ -11,14 +11,29 @@ Documentation
   :Release: |version|
   :Date: |today|
 
+.. note:: This documentation is for the latest version of
+   `minorminer <https://github.com/dwavesystems/minorminer>`_.
+   Documentation for the version currently installed by
+   `dwave-ocean-sdk <https://github.com/dwavesystems/dwave-ocean-sdk>`_
+   is here: :std:doc:`minorminer <oceandocs:docs_minorminer/sdk_index>`.
+
+.. sdk-start-marker
+
 .. toctree::
     :maxdepth: 2
 
     intro
     reference/index
-    installation
-    license
-    Source <https://github.com/dwavesystems/minorminer>
+
+.. sdk-end-marker
+
+.. toctree::
+  :caption: Code
+  :maxdepth: 1
+
+  Source <https://github.com/dwavesystems/minorminer>
+  installation
+  license
 
 .. toctree::
   :caption: D-Wave's Ocean Software

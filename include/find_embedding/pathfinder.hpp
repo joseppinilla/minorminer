@@ -1,3 +1,17 @@
+// Copyright 2017 - 2020 D-Wave Systems Inc.
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//
+//        http://www.apache.org/licenses/LICENSE-2.0
+//
+//    Unless required by applicable law or agreed to in writing, software
+//    distributed under the License is distributed on an "AS IS" BASIS,
+//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//    See the License for the specific language governing permissions and
+//    limitations under the License.
+
 #pragma once
 
 #include <algorithm>
@@ -117,32 +131,36 @@ class pathfinder_base : public pathfinder_public_interface {
         }
     }
 
-    void set_initial_chains(map<int, vector<int>> chains) {
+    //! setter for the initial_chains parameter
+    virtual void set_initial_chains(map<int, vector<int>> chains) override {
         initEmbedding = embedding_t(ep, params.fixed_chains, chains);
     }
 
     virtual ~pathfinder_base() {}
 
     //! nonzero return if this is an improvement on our previous best embedding
-    int check_improvement(const embedding_t &emb) {
-        int better = 0;
+    bool check_improvement(const embedding_t &emb) {
+        bool better = 0;
         int embedded = emb.statistics(tmp_stats);
         if (embedded > ep.embedded) {
             ep.major_info("embedding found.\n");
-            better = ep.embedded = 1;
+            better = true;
+            ep.embedded = 1;
         }
         if (embedded < ep.embedded) return 0;
         int minorstat = tmp_stats.back();
-        int major = best_stats.size() - tmp_stats.size();
+        int major = static_cast<int>(best_stats.size()) - static_cast<int>(tmp_stats.size());
         int minor = (best_stats.size() == 0) ? 0 : best_stats.back() - minorstat;
 
         better |= (major > 0) || (best_stats.size() == 0);
         if (better) {
             if (ep.embedded) {
-                ep.major_info("max chain length %d; num max chains=%d\n", tmp_stats.size() - 1, minorstat);
-                ep.target_chainsize = tmp_stats.size() - 1;
+                ep.major_info("max chain length %d; num max chains=%d\n", static_cast<int>(tmp_stats.size()) - 1,
+                              minorstat);
+                ep.target_chainsize = static_cast<int>(tmp_stats.size()) - 1;
             } else {
-                ep.major_info("max qubit fill %d; num maxfull qubits=%d\n", tmp_stats.size() + 1, minorstat);
+                ep.major_info("max qubit fill %d; num maxfull qubits=%d\n", static_cast<int>(tmp_stats.size()) + 1,
+                              minorstat);
             }
         }
         if ((!better) && (major == 0) && (minor > 0)) {
@@ -151,10 +169,10 @@ class pathfinder_base : public pathfinder_public_interface {
             } else {
                 ep.minor_info("    num max qubits=%d\n", minorstat);
             }
-            better = 1;
+            better = true;
         }
         if (!better && (major == 0) && (minor == 0)) {
-            for (int i = tmp_stats.size(); i--;) {
+            for (size_t i = tmp_stats.size(); i--;) {
                 if (tmp_stats[i] == best_stats[i]) continue;
                 if (tmp_stats[i] < best_stats[i]) better = 1;
                 break;
@@ -183,6 +201,26 @@ class pathfinder_base : public pathfinder_public_interface {
         }
     }
 
+    //! internal function to check if we're supposed to stop for an external reason -- namely
+    //! if we've timed out (which we catch immediately and return -2 to allow the heuristic to
+    //! terminate gracefully), or received a keyboard interrupt (which we allow to propagate
+    //! back to the user).  If neither stopping condition is encountered, return `return_value`.
+    inline int check_stops(const int &return_value) {
+        try {
+            params.localInteractionPtr->cancelled(stoptime);
+        } catch (const TimeoutException & /*e*/) {
+            ep.major_info("problem timed out");
+            return -2;
+        } catch (const ProblemCancelledException &e) {
+            ep.major_info("problem cancelled via keyboard interrupt");
+            if (params.interactive)
+                return -2;
+            else
+                throw;
+        }
+        return return_value;
+    }
+
     //! sweep over all variables, either keeping them if they are pre-initialized and connected,
     //! and otherwise finding new chains for them (each, in turn, seeking connection only with
     //! neighbors that already have chains)
@@ -195,10 +233,7 @@ class pathfinder_base : public pathfinder_public_interface {
                 if (!find_chain(emb, u)) return -1;
             }
         }
-        if (params.localInteractionPtr->cancelled(stoptime))
-            return -2;
-        else
-            return 1;
+        return check_stops(1);
     }
 
     //! tear up and replace each variable
@@ -211,11 +246,7 @@ class pathfinder_base : public pathfinder_public_interface {
             improved |= check_improvement(emb);
             if (ep.embedded) break;
         }
-        if (params.localInteractionPtr->cancelled(stoptime))
-            return -2;
-        else {
-            return improved;
-        }
+        return check_stops(static_cast<int>(improved));
     }
 
     //! tear up and replace each chain, strictly improving or maintaining the
@@ -230,16 +261,17 @@ class pathfinder_base : public pathfinder_public_interface {
                 int maxfill = 0;
                 emb.steal_all(u);
                 for (auto &q : emb.get_chain(u)) maxfill = max(maxfill, emb.weight(q));
-
+                ep.debug("maxfill is %d\n", maxfill);
                 ep.weight_bound = max(0, maxfill);
                 emb.freeze_out(u);
-                ;
                 if (!find_chain(emb, u, 0)) {
+                    ep.debug("pushdown bounced!\n", u);
                     pushback += 3;
                     emb.thaw_back(u);
                     emb.flip_back(u, 0);
                 }
             } else {
+                ep.debug("finding a new chain for %d (pushdown bypass)\n", u);
                 ep.weight_bound = oldbound;
                 emb.steal_all(u);
                 emb.tear_out(u);
@@ -251,12 +283,8 @@ class pathfinder_base : public pathfinder_public_interface {
             if (ep.embedded) break;
         }
         ep.weight_bound = oldbound;
-        if (params.localInteractionPtr->cancelled(stoptime))
-            return -2;
-        else {
-            if (!improved) pushback += (num_vars * 2) / params.inner_rounds;
-            return improved;
-        }
+        if (!improved) pushback += (num_vars * 2) / params.inner_rounds;
+        return check_stops(improved);
     }
 
     //! tear up and replace each chain, attempting to rebalance the chains and
@@ -271,11 +299,7 @@ class pathfinder_base : public pathfinder_public_interface {
 
             improved |= check_improvement(emb);
         }
-        if (params.localInteractionPtr->cancelled(stoptime))
-            return -2;
-        else {
-            return improved;
-        }
+        return check_stops(improved);
     }
 
     //! incorporate the qubit weights associated with the chain for `v` into
@@ -328,7 +352,7 @@ class pathfinder_base : public pathfinder_public_interface {
         // will be altered for at least one neighbor per pass.
         auto &nbrs = ep.var_neighbors(u, rndswap_first{});
         if (nbrs.size() > 0) {
-            int v = nbrs[ep.randint(0, nbrs.size() - 1)];
+            int v = nbrs[ep.randint(0, static_cast<int>(nbrs.size() - 1))];
             qubit_permutations[u].swap(qubit_permutations[v]);
         }
 
@@ -337,7 +361,7 @@ class pathfinder_base : public pathfinder_public_interface {
         // select a random root among those qubits at minimum heuristic distance
         collectMinima(total_distance, min_list);
 
-        int q0 = min_list[ep.randint(0, min_list.size() - 1)];
+        int q0 = min_list[ep.randint(0, static_cast<int>(min_list.size()) - 1)];
         if (total_distance[q0] == max_distance) return 0;  // oops all qubits were overfull or unreachable
 
         emb.construct_chain_steiner(u, q0, parents, distances, visited_list);
@@ -356,7 +380,7 @@ class pathfinder_base : public pathfinder_public_interface {
         auto &counts = total_distance;
         counts.assign(num_qubits, 0);
         unsigned int best_size = std::numeric_limits<unsigned int>::max();
-        int q, degree = ep.var_neighbors(u).size();
+        int q, degree = static_cast<int>(ep.var_neighbors(u).size());
         distance_t d;
 
         unsigned int stopcheck = static_cast<unsigned int>(max(last_size, target_chainsize));
@@ -506,7 +530,7 @@ class pathfinder_base : public pathfinder_public_interface {
 
   public:
     virtual void quickPass(VARORDER varorder, int chainlength_bound, int overlap_bound, bool local_search,
-                           bool clear_first, double round_beta) {
+                           bool clear_first, double round_beta) override {
         const vector<int> &vo = ep.var_order(varorder);
         if (vo.size() == 0)
             throw BadInitializationException(
@@ -518,7 +542,7 @@ class pathfinder_base : public pathfinder_public_interface {
     }
 
     virtual void quickPass(const vector<int> &varorder, int chainlength_bound, int overlap_bound, bool local_search,
-                           bool clear_first, double round_beta) {
+                           bool clear_first, double round_beta) override {
         int lastsize, got;
         int old_bound = ep.weight_bound;
         ep.weight_bound = 1 + overlap_bound;
@@ -569,16 +593,21 @@ class pathfinder_base : public pathfinder_public_interface {
             if (initEmbedding.linked()) {
                 currEmbedding = initEmbedding;
             } else {
-                ep.error(
-                        "cannot bootstrap from initial embedding.  stopping.  disable skip_initialization or throw "
-                        "this embedding away\n");
-                return 0;
+                throw BadInitializationException(
+                        "cannot bootstrap from initial embedding.  "
+                        "disable skip_initialization or throw this embedding away");
             }
         } else {
             currEmbedding = initEmbedding;
-            if (initialization_pass(currEmbedding) <= 0) {
-                ep.error("failed during initialization. embeddings may be invalid.\n");
-                return 0;
+            switch (initialization_pass(currEmbedding)) {
+                case -2:
+                    return 0;
+                case -1:
+                    throw BadInitializationException(
+                            "Failed during initialization.  This typically "
+                            "occurs when the source graph is unreasonably large or when the embedding "
+                            "problem is over-constrained (via max_fill, initial_chains, fixed_chains, "
+                            "and/or restrict_chains).");
             }
         }
         ep.major_info("initialized\n");
@@ -621,10 +650,9 @@ class pathfinder_base : public pathfinder_public_interface {
                         break;
                 }
             }
-            if (trial_patience && (ep.embedded) && (improvement_patience == 0)) {
-                ep.initialized = 0;
-                ep.desperate = 1;
-                currEmbedding = bestEmbedding;
+            if (trial_patience && !ep.embedded && !improvement_patience) {
+                ep.initialized = ep.desperate = pushback = 0;
+                currEmbedding = initEmbedding;
                 int r = initialization_pass(currEmbedding);
                 switch (r) {
                     case -2:
@@ -634,11 +662,11 @@ class pathfinder_base : public pathfinder_public_interface {
                         currEmbedding = bestEmbedding;
                         break;
                     case 1:
+                        best_stats.clear();  // overwrite bestEmbedding for a real restart
                         check_improvement(currEmbedding);
                         break;
                 }
                 ep.initialized = 1;
-                ep.desperate = 0;
             }
         }
 
@@ -704,9 +732,15 @@ class pathfinder_serial : public pathfinder_base<embedding_problem_t> {
             super::accumulate_distance(emb, v, super::visited_list[v]);
         }
 
-        if (!neighbors_embedded)
+        if (!neighbors_embedded) {
             for (int q = super::num_qubits; q--;)
-                if (emb.weight(q) >= super::ep.weight_bound) super::total_distance[q] = max_distance;
+                if (emb.weight(q) >= super::ep.weight_bound) {
+                    super::total_distance[q] = max_distance;
+                } else {
+                    distance_t d = max(super::qubit_weight[q], super::total_distance[q]);
+                    super::total_distance[q] = d;
+                }
+        }
     }
 };
 
@@ -821,4 +855,4 @@ class pathfinder_parallel : public pathfinder_base<embedding_problem_t> {
         });
     }
 };
-}
+}  // namespace find_embedding

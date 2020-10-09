@@ -1,3 +1,17 @@
+// Copyright 2017 - 2020 D-Wave Systems Inc.
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//
+//        http://www.apache.org/licenses/LICENSE-2.0
+//
+//    Unless required by applicable law or agreed to in writing, software
+//    distributed under the License is distributed on an "AS IS" BASIS,
+//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//    See the License for the specific language governing permissions and
+//    limitations under the License.
+
 #include <mex.h>
 #include <random>
 #include <set>
@@ -93,6 +107,11 @@ class LocalInteractionMATLAB : public find_embedding::LocalInteraction {
         mexEvalString("drawnow;");
     }
 
+    virtual void displayErrorImpl(const std::string& msg) const {
+        mexPrintf("%s", msg.c_str());
+        mexEvalString("drawnow;");
+    }
+
     virtual bool cancelledImpl() const {
         if (utIsInterruptPending()) {
             utSetInterruptPending(false);
@@ -121,6 +140,7 @@ void checkFindEmbeddingParameters(const mxArray* paramsArray,
     paramsNameSet.insert("timeout");
     paramsNameSet.insert("tries");
     paramsNameSet.insert("verbose");
+    paramsNameSet.insert("interactive");
     paramsNameSet.insert("inner_rounds");
     paramsNameSet.insert("max_fill");
     paramsNameSet.insert("return_overlap");
@@ -196,6 +216,11 @@ void checkFindEmbeddingParameters(const mxArray* paramsArray,
     if (fieldValueArray)
         parseScalar(fieldValueArray, "verbose parameter must be an integer >= 0", findEmbeddingExternalParams.verbose);
 
+    fieldValueArray = mxGetField(paramsArray, 0, "interactive");
+    if (fieldValueArray)
+        parseBoolean(fieldValueArray, "verbose parameter must be a boolean value",
+                     findEmbeddingExternalParams.interactive);
+
     fieldValueArray = mxGetField(paramsArray, 0, "return_overlap");
     if (fieldValueArray)
         parseBoolean(fieldValueArray, "return_overlap parameter must be a boolean value",
@@ -216,7 +241,7 @@ void checkFindEmbeddingParameters(const mxArray* paramsArray,
         parseChainArray(fieldValueArray, "restrict_chains parameter must be a cell array of matrices",
                         findEmbeddingExternalParams.restrict_chains);
 }
-}
+}  // namespace
 
 // problem, A, params
 void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
