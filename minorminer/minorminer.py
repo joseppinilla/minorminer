@@ -16,7 +16,7 @@ from __future__ import absolute_import as __absolute_import
 from minorminer._minorminer import miner, VARORDER, find_embedding as __find_embedding
 from minorminer._topominer import topo_embedding as __topo_embedding
 from functools import wraps as __wraps
-from networkx import spring_layout
+import networkx as nx
 
 # This wrapper exists to overcome a curious limitation of Cython, and make
 # find_embedding friendlier for the inspect module.
@@ -76,9 +76,12 @@ def topo_embedding(S, T, source_layout=None, target_layout=None,
                    verbose=0,
                    ):
     if source_layout is None:
-        source_layout = spring_layout(S,weight=None)
+        nx.set_edge_attributes(S, 'weight', {k:len(S.adj[k]) for k in S.edges})
+
+
+        source_layout = nx.spring_layout(S)
     if target_layout is None:
-        target_layout = spring_layout(T,weight=None)
+        target_layout = nx.spring_layout(T,weight=None)
 
     return __topo_embedding(S, T, source_layout, target_layout,
                             max_no_improvement=max_no_improvement,
