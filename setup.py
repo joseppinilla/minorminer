@@ -119,6 +119,8 @@ classifiers = [
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
 ]
 
 python_requires = '>=3.5'
@@ -137,7 +139,9 @@ setup(
     license="Apache 2.0",
     ext_modules=extensions,
     packages=['minorminer',
-              'minorminer.layout'],
+              'minorminer.layout',
+              'minorminer.utils',
+              ],
     classifiers=classifiers,
     python_requires=python_requires,
     install_requires=install_requires,

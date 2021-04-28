@@ -1,4 +1,4 @@
-# Copyright 2018 - 2020 D-Wave Systems Inc.
+# Copyright 2020 D-Wave Systems Inc.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -11,8 +11,12 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
+#
+# 
 
-__version__ = "0.2.5"
-__author__ = "Kelly Boothby"
-__authoremail__ = "boothby@dwavesys.com"
-__description__ = "heuristic algorithm to find graph minor embeddings"
+import minorminer.utils.chimera
+import minorminer.utils.pegasus
+from minorminer.utils.exceptions import (MissingChainError, ChainOverlapError,
+DisconnectedChainError, InvalidNodeError, MissingEdgeError)
+from minorminer.utils.diagnostic import (diagnose_embedding, is_valid_embedding,
+verify_embedding)
