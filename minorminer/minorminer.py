@@ -76,7 +76,7 @@ def topo_embedding(S, T, source_layout=None, target_layout=None,
                    verbose=0,
                    ):
     if source_layout is None:
-        nx.set_edge_attributes(S, 'weight', {k:len(S.adj[k]) for k in S.edges})
+        nx.set_edge_attributes(S, {u:len(S.adj[u]) for u,v in S.edges}, 'weight')
 
 
         source_layout = nx.spring_layout(S)

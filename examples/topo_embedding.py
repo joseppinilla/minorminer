@@ -11,16 +11,14 @@ fig, axs = plt.subplots(2, 4, subplot_kw={'aspect':'equal'})
 C = dnx.chimera_graph(16, 16, coordinates=True)
 nx.draw(C,pos=dnx.chimera_layout(C),node_size=5,ax=axs.flat[0])
 
-
-
-
-
 # Trivial problem graph
 G = nx.grid_2d_graph(16,16)
 # Non-exact layout for grid i.e. has overlap
-nx.draw(G,pos=nx.spring_layout(G,seed=16),node_size=5,ax=axs.flat[1])
+source_layout = nx.spring_layout(G,seed=16)
+nx.draw(G,pos=source_layout,node_size=5,ax=axs.flat[1])
+nx.draw(G,pos=source_layout,node_size=5,ax=axs.flat[2])
 # Exact layout
-nx.draw(G,pos={v:v for v in G},node_size=5,ax=axs.flat[2])
+nx.draw(G,pos={v:v for v in G},node_size=5,ax=axs.flat[3])
 
 # For quality metrics
 miner = minorminer.miner(G,C)
@@ -49,17 +47,14 @@ state, O, L = miner.quality_key(embedding,embedded=True)
 total = sum([L[i]*L[i+1] for i in range(0,len(L),2)])
 print("Layout-Aware (MML): Total: %d Max: %d t: %.2fs" % (total,L[0],end - start))
 
-
 ########################### Topominer w/ non-exact layout
 start = time.time()
 # Measure time of finding layout as part of algorithm
 scale = 2*len(G.edges)/len(G.nodes)
 weight = {(u,v):scale/(len(G.adj[u])*len(G.adj[v])) for u,v in G.edges}
 nx.set_edge_attributes(G, weight, 'weight')
-source_layout = nx.spring_layout(G,pos={v:v for v in G},seed=16)
 source_layout = nx.spring_layout(G,seed=16)
 
-nx.draw(G,pos=source_layout,node_size=10)
 # NOTE: target_layout must be (int,int) for now. Using Chimera tile.
 target_layout = {(i,j,u,k):(i,j) for (i,j,u,k) in C}
 embedding = minorminer.topo_embedding(G,C,None,target_layout)
@@ -84,20 +79,3 @@ print("Layout-Aware Exact: Total: %d Max: %d t: %.2fs" % (total,L[0],end - start
 
 plt.tight_layout()
 plt.show()
-
-
-
-G = nx.karate_club_graph()
-nx.draw(G)
-
-scale = (2*len(G.edges)/len(G.nodes))**2
-weight = {(u,v):scale*(len(G.adj[u])*len(G.adj[v])) for u,v in G.edges}
-nx.set_edge_attributes(G, weight, 'weight')
-source_layout = nx.spring_layout(G,seed=16)
-nx.draw(G,pos=source_layout)
-
-scale = (2*len(G.edges)/len(G.nodes))**2
-weight = {(u,v):scale/(len(G.adj[u])*len(G.adj[v])) for u,v in G.edges}
-nx.set_edge_attributes(G, weight, 'weight')
-source_layout = nx.spring_layout(G,seed=None)
-nx.draw(G,pos=source_layout)
