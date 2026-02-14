@@ -19,7 +19,7 @@ include "busclique_h.pxi"
 import homebase
 import os
 import pathlib
-import fasteners
+# import fasteners
 import threading
 import random
 import gzip
@@ -458,53 +458,56 @@ class busgraph_cache:
         rootdir = busgraph_cache.cache_rootdir()
         basedir = os.path.join(rootdir, dirname)
         pathlib.Path(basedir).mkdir(parents=True, exist_ok=True)
-        lockfile = os.path.join(basedir, ".lock")
+        
+        # We no longer need the lockfile path for fasteners
         lrufile = os.path.join(basedir, ".lru")
         identifier = self._graph.identifier
         shortcode = self._graph.short_identifier
 
-        #this makes our writes to the filesystem atomic
         file_context = copy_on_close_context()
 
-        #this solves thread-safety?
+        # Retain thread-safety for multi-threaded Python apps
         with __global_locks[dirname]:
-            #this solves inter-process safety?
-            with fasteners.InterProcessLock(lockfile):
-                cachefile = os.path.join(basedir, str(shortcode))
-                if os.path.exists(cachefile):
-                    with open(cachefile, 'rb') as filecache:
-                        currcache = load(filecache)
-                else:
-                    currcache = {}
-                cache = None if force_write else currcache.get(identifier)
-                if cache is None:
-                    cache = compute()
-                    currcache[identifier] = cache
-                    with file_context.open(cachefile, 'wb') as filecache:
-                        dump(currcache, filecache)
+            cachefile = os.path.join(basedir, str(shortcode))
+            
+            # 1. Read or initialize the specific cache file
+            if os.path.exists(cachefile):
+                with open(cachefile, 'rb') as filecache:
+                    currcache = load(filecache)
+            else:
+                currcache = {}
 
-                #now, update the LRU cache -- if this was being done in-memory,
-                #there are more efficient algorithms... but since we're doing
-                #linear-time read&write, might as well do it the lazy way.
-                try:
-                    with open(lrufile, 'rb') as lru:
-                        LRU = load(lru)
-                except FileNotFoundError:
-                    LRU = []
-                newLRU = [shortcode]
-                for x in LRU:
-                    if x != shortcode:
-                        newLRU.append(x)
+            # 2. Get data or compute it
+            cache = None if force_write else currcache.get(identifier)
+            if cache is None:
+                cache = compute()
+                currcache[identifier] = cache
+                # Atomic write via copy-on-close
+                with file_context.open(cachefile, 'wb') as filecache:
+                    dump(currcache, filecache)
 
-                #this violates atomicity, but it's okay -- at worst, we'll need
-                #to recompute a deleted file that still has an entry in the LRU
-                while len(newLRU) > __lru_size:
-                    oldkey = newLRU.pop()
-                    os.remove(os.path.join(basedir, oldkey))
-                with file_context.open(lrufile, 'wb') as lru:
-                    dump(newLRU, lru)
+            # 3. Update the LRU list
+            try:
+                with open(lrufile, 'rb') as lru:
+                    LRU = load(lru)
+            except (FileNotFoundError, EOFError):
+                LRU = []
 
-        #perform the copy-on-write for the lrufile and cachefile
+            # Re-order LRU: move current shortcode to front
+            newLRU = [shortcode] + [x for x in LRU if x != shortcode]
+
+            # 4. Cleanup old files if LRU size exceeded
+            while len(newLRU) > __lru_size:
+                old_shortcode = newLRU.pop()
+                old_path = os.path.join(basedir, str(old_shortcode))
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+
+            # 5. Save the updated LRU list
+            with file_context.open(lrufile, 'wb') as lru:
+                dump(newLRU, lru)
+
+        # Finalize all file writes
         file_context.close()
         return cache
 
